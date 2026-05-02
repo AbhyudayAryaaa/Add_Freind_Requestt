@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>For You 💌</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#1a1a2e;font-family:'Courier New',Courier,monospace;display:flex;align-items:center;justify-content:center;min-height:100vh}
+  .window{position:relative;width:480px;height:480px;background:#1a1a2e;overflow:hidden;flex-shrink:0}
+  canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0}
+  .border-outer{position:absolute;inset:8px;border:2px dashed #ff6b9d;border-radius:2px;pointer-events:none;z-index:1}
+  .border-inner{position:absolute;inset:14px;border:1px dashed #c77dff;border-radius:2px;pointer-events:none;z-index:1}
+  .content{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;z-index:2}
+  .emoji-header{color:#ffd93d;font-size:36px;margin-top:54px;letter-spacing:2px;font-family:Arial,sans-serif}
+  .card-box{background:#16213e;width:380px;padding:22px 20px;text-align:center;margin-top:28px;border-radius:4px}
+  .card-box h1{color:#f0f0f0;font-size:22px;font-weight:bold;font-family:'Courier New',monospace;transition:font-size 0.15s}
+  .sub-text{color:#6bcfff;font-size:11px;margin-top:22px;letter-spacing:0.5px}
+  .yes-btn{margin-top:28px;background:#ff6b9d;color:#f0f0f0;border:none;padding:10px 18px;font-family:'Courier New',monospace;font-size:13px;font-weight:bold;cursor:pointer;border-radius:3px;transition:background 0.15s,color 0.15s;letter-spacing:1px}
+  .yes-btn:hover{background:#6bcb77;color:#1a1a2e}
+  .no-btn{position:absolute;background:#ff6b9d;color:#f0f0f0;border:none;padding:6px 12px;font-family:'Courier New',monospace;font-size:11px;font-weight:bold;cursor:pointer;border-radius:3px;z-index:5;transition:background 0.1s}
+  .no-btn:hover{background:#6bcb77;color:#1a1a2e}
+  .footer{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);color:#44445a;font-size:9px;letter-spacing:2px;z-index:2;white-space:nowrap}
+
+  /* overlay popup */
+  .overlay{display:none;position:absolute;inset:0;background:rgba(10,8,28,0.88);z-index:20;align-items:center;justify-content:center}
+  .overlay.show{display:flex}
+  .popup{background:#1a1a2e;border-radius:6px;width:380px;height:280px;position:relative;overflow:hidden;text-align:center;animation:popIn 0.35s cubic-bezier(.17,.67,.37,1.35)}
+  @keyframes popIn{from{transform:scale(0.5);opacity:0}to{transform:scale(1);opacity:1}}
+  .popup canvas{position:absolute;top:0;left:0;width:100%;height:100%;z-index:0}
+  .popup-content{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%}
+  .popup-emoji{font-size:52px;font-family:Arial,sans-serif;line-height:1;margin-bottom:10px;transition:font-size 0.1s}
+  .popup-msg{color:#ffd93d;font-size:16px;font-weight:bold;font-family:'Courier New',monospace;margin-bottom:8px}
+  .popup-sub{color:#ff6b9d;font-size:13px;font-family:'Courier New',monospace;margin-bottom:18px}
+  .close-btn{background:#ff6b9d;color:#1a1a2e;border:none;padding:6px 16px;font-family:'Courier New',monospace;font-size:11px;font-weight:bold;cursor:pointer;border-radius:3px}
+  .close-btn:hover{background:#6bcb77}
+</style>
+</head>
+<body>
+
+<div class="window" id="win">
+  <!-- background gradient canvas -->
+  <canvas id="bgCanvas"></canvas>
+
+  <!-- particle canvas (added by JS) -->
+
+  <!-- dashed border rings -->
+  <div class="border-outer"></div>
+  <div class="border-inner"></div>
+
+  <!-- main content -->
+  <div class="content">
+    <div class="emoji-header">(>_&lt;) 💌</div>
+    <div class="card-box">
+      <h1 id="cardTitle">Will You Be My Friend?</h1>
+    </div>
+    <div class="sub-text">Go on… tap Yes! You know you want to ★</div>
+    <button class="yes-btn" onclick="showPopup()">✔&nbsp;&nbsp;Yes, of course!</button>
+  </div>
+
+  <!-- evasive No button -->
+  <button class="no-btn" id="noBtn" style="left:360px;top:410px">✘&nbsp;&nbsp;No</button>
+
+  <!-- footer -->
+  <div class="footer">♥&nbsp;&nbsp;Made with love&nbsp;&nbsp;♥</div>
+
+  <!-- popup overlay -->
+  <div class="overlay" id="overlay">
+    <div class="popup" id="popup">
+      <canvas id="popCanvas"></canvas>
+      <div class="popup-content">
+        <div class="popup-emoji" id="popEmoji">🎊</div>
+        <div class="popup-msg">Arre Thank U So Much Yaar!</div>
+        <div class="popup-sub">XD &nbsp;:-)&nbsp; ;)&nbsp; (^_^) &nbsp;♥</div>
+        <button class="close-btn" onclick="closePopup()">💖 Yay!</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── colour palette (same as Python) ─────────────────────────────
+  const BG     = '#1a1a2e';
+  const CARD   = '#16213e';
+  const PINK   = '#ff6b9d';
+  const YELLOW = '#ffd93d';
+  const CYAN   = '#6bcfff';
+  const GREEN  = '#6bcb77';
+  const WHITE  = '#f0f0f0';
+  const PURPLE = '#c77dff';
+  const COLS   = [PINK, YELLOW, CYAN, PURPLE, GREEN];
+  const CHARS  = ['✦', '★', '♥', '✿', '◆', '•'];
+
+  // ── background gradient stripes (same as Python) ─────────────────
+  const bgCv  = document.getElementById('bgCanvas');
+  const bgCtx = bgCv.getContext('2d');
+  bgCv.width  = 480;
+  bgCv.height = 480;
+
+  for (let i = 0; i < 12; i++) {
+    const shade = 26 + i * 2;
+    const blue  = Math.min(shade + 30, 80);
+    const hex   = v => (v < 16 ? '0' : '') + v.toString(16);
+    bgCtx.fillStyle = '#' + hex(shade) + hex(shade) + hex(blue);
+    bgCtx.fillRect(0, i * 40, 480, 40);
+  }
+
+  // ── particle canvas ───────────────────────────────────────────────
+  const pCv = document.createElement('canvas');
+  pCv.width  = 480;
+  pCv.height = 480;
+  pCv.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1';
+  document.getElementById('win').appendChild(pCv);
+  const pCtx = pCv.getContext('2d');
+
+  // 22 particles just like Python
+  const particles = [];
+  for (let i = 0; i < 22; i++) {
+    particles.push({
+      x:     Math.random() * 480,
+      y:     Math.random() * 480,
+      size:  Math.random() * 4 + 6,
+      speed: Math.random() * 0.9 + 0.3,
+      drift: Math.random() * 0.8 - 0.4,
+      color: COLS[Math.random() * COLS.length | 0],
+      char:  CHARS[Math.random() * CHARS.length | 0]
+    });
+  }
+
+  function animParticles() {
+    pCtx.clearRect(0, 0, 480, 480);
+    particles.forEach(p => {
+      pCtx.fillStyle = p.color;
+      pCtx.font      = p.size + 'px Arial';
+      pCtx.fillText(p.char, p.x, p.y);
+      p.y -= p.speed;
+      p.x += p.drift;
+      if (p.y < -20 || p.x < -20 || p.x > 500) {
+        p.x = Math.random() * 480;
+        p.y = 490;
+      }
+    });
+    requestAnimationFrame(animParticles);
+  }
+  animParticles();
+
+  // ── heartbeat title animation ─────────────────────────────────────
+  const titleEl  = document.getElementById('cardTitle');
+  const hbSizes  = [22, 24, 22, 20, 22];
+  let   hbIndex  = 0;
+  setInterval(() => {
+    titleEl.style.fontSize = hbSizes[hbIndex++ % hbSizes.length] + 'px';
+  }, 220);
+
+  // ── No button evasion ─────────────────────────────────────────────
+  const noBtn = document.getElementById('noBtn');
+  function moveNo() {
+    const win = document.getElementById('win');
+    const mw  = win.offsetWidth  - noBtn.offsetWidth  - 10;
+    const mh  = win.offsetHeight - noBtn.offsetHeight - 10;
+    noBtn.style.left = (Math.random() * mw + 10) + 'px';
+    noBtn.style.top  = (Math.random() * mh + 10) + 'px';
+  }
+  noBtn.addEventListener('mouseenter', moveNo);
+  noBtn.addEventListener('click',      moveNo);
+  noBtn.addEventListener('touchstart', moveNo);
+
+  // ── popup blob canvas ─────────────────────────────────────────────
+  const popCv  = document.getElementById('popCanvas');
+  const popCtx = popCv.getContext('2d');
+  popCv.width  = 380;
+  popCv.height = 280;
+
+  function drawPopBlobs() {
+    popCtx.fillStyle = BG;
+    popCtx.fillRect(0, 0, 380, 280);
+    for (let i = 0; i < 18; i++) {
+      const px = 10 + Math.random() * 360;
+      const py = 10 + Math.random() * 260;
+      const r  = 6  + Math.random() * 12;
+      popCtx.beginPath();
+      popCtx.arc(px, py, r, 0, Math.PI * 2);
+      popCtx.fillStyle = COLS[Math.random() * COLS.length | 0];
+      popCtx.fill();
+    }
+  }
+
+  // ── popup open / close ────────────────────────────────────────────
+  let pulseInterval = null;
+
+  function showPopup() {
+    drawPopBlobs();
+    document.getElementById('overlay').classList.add('show');
+
+    // pulse emoji like Python _pulse_label
+    const em     = document.getElementById('popEmoji');
+    const pSizes = [52, 48, 44, 48];
+    let   pi     = 0;
+    pulseInterval = setInterval(() => {
+      em.style.fontSize = pSizes[pi++ % pSizes.length] + 'px';
+    }, 160);
+  }
+
+  function closePopup() {
+    document.getElementById('overlay').classList.remove('show');
+    clearInterval(pulseInterval);
+  }
+</script>
+</body>
+</html>
